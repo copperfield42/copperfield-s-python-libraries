@@ -1,2 +1,2 @@
-# copperfield-s-python-libraries
+# copperfield's python libraries
 collections of several modules
