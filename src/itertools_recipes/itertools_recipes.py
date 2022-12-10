@@ -784,7 +784,7 @@ def lookahead(iterable:Iterable[T],looksteps:int=1, fillvalue:X|None=None) -> It
     return zip_longest(*grupo,fillvalue=fillvalue)
 
 
-def isplit(iterable:Iterable[T], separator:Callable[[T],bool]|T=bool, container:Contenedor=tuple) -> Iterator[Any]:
+def isplit(iterable:Iterable[T], separator:Callable[[T],bool]|T=operator.not_, container:Contenedor=tuple) -> Iterator[Any]:
     """
     split the iterable into tuples (or whatever container)
     where the cut off are the given element
@@ -799,10 +799,13 @@ def isplit(iterable:Iterable[T], separator:Callable[[T],bool]|T=bool, container:
 
 
     """
-    if not callable(separator):
-        key:Callable[[Any],bool] = partial(operator.ne,separator)
+    if separator is operator.not_:
+        key = bool
     else:
-        key = lambda x: not separator(x) #type: ignore
+        if not callable(separator):
+            key:Callable[[Any],bool] = partial(operator.ne,separator)
+        else:
+            key = lambda x: not separator(x) #type: ignore
     for k,v in groupby(iterable, key=key):
         if k:
             yield container(v)
@@ -882,8 +885,26 @@ def skip(iterable:Iterable[T], to_skip:int) -> Iterator[T]:
         yield from (x for i,x in enumerate(iterable) if i%to_skip)
 
 
-
-
+def insert_marker(iterable:Iterable[T], marker:T, predicate:Callable[[T],bool], after:bool=True) -> Iterator[T]:
+    """
+    insert the given element before or after the given predicate is true
+    
+    >>> list(ir.insert_item(range(1,21),"-", lambda x:x%5==0,after=True))
+    [1, 2, 3, 4, 5, '-', 6, 7, 8, 9, 10, '-', 11, 12, 13, 14, 15, '-', 16, 17, 18, 19, 20, '-']
+    >>> 
+    >>> list(ir.insert_item(range(1,21),"-", lambda x:x%5==0,after=False))
+    [1, 2, 3, 4, '-', 5, 6, 7, 8, 9, '-', 10, 11, 12, 13, 14, '-', 15, 16, 17, 18, 19, '-', 20]
+    >>> 
+        
+    
+    
+    """
+    for elem in iterable:
+        if predicate(elem):
+            pack = (elem, marker) if after else (marker, elem)
+            yield from pack
+        else:
+            yield elem
 
 
 
