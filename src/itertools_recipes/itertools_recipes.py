@@ -889,10 +889,10 @@ def insert_marker(iterable:Iterable[T], marker:T, predicate:Callable[[T],bool], 
     """
     insert the given element before or after the given predicate is true
     
-    >>> list(ir.insert_item(range(1,21),"-", lambda x:x%5==0,after=True))
+    >>> list(insert_marker(range(1,21),"-", lambda x:x%5==0,after=True))
     [1, 2, 3, 4, 5, '-', 6, 7, 8, 9, 10, '-', 11, 12, 13, 14, 15, '-', 16, 17, 18, 19, 20, '-']
     >>> 
-    >>> list(ir.insert_item(range(1,21),"-", lambda x:x%5==0,after=False))
+    >>> list(insert_marker(range(1,21),"-", lambda x:x%5==0,after=False))
     [1, 2, 3, 4, '-', 5, 6, 7, 8, 9, '-', 10, 11, 12, 13, 14, '-', 15, 16, 17, 18, 19, '-', 20]
     >>> 
         
