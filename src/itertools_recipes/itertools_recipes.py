@@ -808,11 +808,14 @@ def isplit(iterable:Iterable[T], separator:Callable[[T],bool]|T=bool, container:
             yield container(v)
 
 
-def interesting_lines(iterable:Iterable[str], enum:bool|int|None=None, *, striper:Callable[[str],str]=str.strip) -> Iterator[str|Tuple[int,str]]:
+def interesting_lines(iterable:Iterable[str], enum:bool|int|None=None, *, striper:Callable[[str],str]=str.strip, splitlines:Callable[[str],str]|None=str.splitlines) -> Iterator[str|Tuple[int,str]]:
     """
     strip and filter out the empty string from the given iterable.
     If enum is True enumerate the iterable first and then firter it out.
     If enum is an int enumerate the iterable first starting at enum and then firter it out.
+    
+    if splitlines is given and iterable is a string it apply it to the 
+    iterable first before doing anything else
 
 
     >>> lines = ["a","","b"," ","c","   d", "e   ", " g "]
@@ -829,6 +832,8 @@ def interesting_lines(iterable:Iterable[str], enum:bool|int|None=None, *, stripe
 
 
     """
+    if splitlines and isinstance(iterable,str):
+        iterable = splitlines(iterable)
     it = map(striper,iterable)
     if enum is not None:
         if isinstance(enum, bool):
