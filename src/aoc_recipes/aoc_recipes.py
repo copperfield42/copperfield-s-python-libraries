@@ -6,39 +6,44 @@ https://adventofcode.com
 """
 from __future__ import annotations
 
-from typing import NamedTuple, TypeVar, Iterable, Iterator
+from typing import NamedTuple, TypeVar, Iterable, Iterator, Hashable, Any
 from math import copysign
+from heapq import heappush, heappop
 from operator import sub, eq, add
 from functools import partial
-import tqdm, sys
-
-from dataclasses import dataclass, field 
+from dataclasses import dataclass, field
 import itertools
-from heapq import heappush, heappop
+import sys
 import numpy
+import tqdm
 
 
 
 __exclude_from_all__=set(dir())
 
+
 T = TypeVar("T")
+X = TypeVar("X")
+Y = TypeVar("Y")
+P = TypeVar("P",bound=Hashable)
+Grafo = TypeVar("Grafo")
+
 
 def get_raw_data(path:str="./input.txt") -> str:
     with open(path) as file:
         return file.read()
 
 
-
 class Point(NamedTuple):
     """2d point"""
     x: int
     y: int
-    
+
     @property
     def real(self):
         return self.x
-    
-    @property 
+
+    @property
     def imag(self):
         return self.y
 
@@ -55,9 +60,7 @@ class Point(NamedTuple):
             return NotImplemented
         return type(self)(x+ox, y+oy)
 
-    def __radd__(self, otro:Point) -> Point:
-        "otro + self"
-        return self + otro
+    __radd__ = __add__
 
     def __neg__(self) -> Point:
         "-self"
@@ -67,7 +70,7 @@ class Point(NamedTuple):
     def __sub__(self, otro:Point) -> Point:
         "self - otro"
         return self + (-otro)
-        
+
     def __mul__(self, otro):
         "self * otro"
         if isinstance(otro, (int,float)):
@@ -76,6 +79,8 @@ class Point(NamedTuple):
             return self.from_complex( complex(self)*otro )
         return NotImplemented
     
+    __rmul__ = __mul__
+
     def __mod__(self, otro:int|Point) -> Point:
         """self % otro
            if otro is a number apply the mod to each coordinate
@@ -86,6 +91,7 @@ class Point(NamedTuple):
         if isinstance(otro, (tuple,type(self))):
             ox,oy = otro
             return type(self)(self.x%ox, self.y%oy)
+        return NotImplemented
 
     def normalize(self) -> Point:
         """
@@ -106,23 +112,61 @@ class Point(NamedTuple):
         x1,y1 = self
         x2,y2 = otro
         return abs(x1-x2) + abs(y1-y2)
-        
+
     def __complex__(self) -> complex:
         return complex(self.x, self.y)
-    
+
     @classmethod
     def from_complex(cls, number:complex) -> Point:
         return cls(int(number.real), int(number.imag))
-        
 
-direcciones={
+    def __divmod__(self, otro:int|Point) -> tuple[Point,Point]:
+        "divmod(self, otro)"
+        if isinstance(otro, int):
+            x,y = self
+            dx,mx = divmod(x,otro)
+            dy,my = divmod(y,otro)
+            return Point(dx,dy),Point(mx,my)
+        if isinstance(otro,(tuple,type(self))):
+            x,y = self
+            ox,oy = otro
+            dx,mx = divmod(x,ox)
+            dy,my = divmod(y,oy)
+            return Point(dx,dy),Point(mx,my)
+        return NotImplemented
+
+    def __rdivmod__(self, otro:int|Point) -> tuple[Point,Point]:
+        "divmod(otro, self)"
+        if isinstance(otro, int):
+            x,y = self
+            dx,mx = divmod(otro,x)
+            dy,my = divmod(otro,y)
+            return Point(dx,dy),Point(mx,my)
+        if isinstance(otro,(tuple,type(self))):
+            x,y = self
+            ox,oy = otro
+            dx,mx = divmod(ox,x)
+            dy,my = divmod(oy,y)
+            return Point(dx,dy),Point(mx,my)
+        return NotImplemented        
+
+
+DIRECCIONES={
     "R":Point(1,0),
     "L":Point(-1,0),
     "U":Point(0,1),
     "D":Point(0,-1),
+    "v":Point(1,0),
+    "^":Point(-1,0),
+    ">":Point(0,1),
+    "<":Point(0,-1),
+    "+":(Point(1,0),Point(-1,0),Point(0,1),Point(0,-1)),
+    "x":(Point(1,1),Point(-1,-1),Point(-1,1),Point(1,-1)),
     }
-    
-def vecinos(point:Point, include_input:bool=False, direcciones:Iterable[Point]=(Point(1,0),Point(-1,0),Point(0,1),Point(0,-1)) ) -> Iterator[Point]:
+DIRECCIONES["*"] = DIRECCIONES["+"]+DIRECCIONES["x"]
+
+
+def vecinos(point:Point, include_input:bool=False, direcciones:Iterable[Point]=DIRECCIONES["+"] ) -> Iterator[Point]:
     """vecinos del punto dado en las 4 direcciones cardinales"""
     if include_input:
         yield point
@@ -130,13 +174,13 @@ def vecinos(point:Point, include_input:bool=False, direcciones:Iterable[Point]=(
 
 
 def is_valid(point:Point|complex, shape:tuple[int,int]) -> bool:
-    """said if the given point fall within a the wiven shape"""
+    """said if the given point fall within the wiven shape"""
     x,y = shape
     return 0<=point.real<x and 0<=point.imag<y
 
 
-def make_vecinos(point:Point|complex, validator:Callable[[Point|complex],bool], include_input:bool=False) -> Iterator[Point]:
-    for v in vecinos(point,include_input=include_input):
+def make_vecinos(point:Point|complex, validator:Callable[[Point|complex],bool], include_input:bool=False, direcciones:str|tuple[Point]="+") -> Iterator[Point]:
+    for v in vecinos(point,include_input=include_input, direcciones=DIRECCIONES[direcciones] if isinstance(direcciones,str) else direcciones ):
         if validator(v):
             yield v
 
@@ -151,9 +195,9 @@ class PriorityQueue:
 
     def __bool__(self):
         return bool(self._entry_finder)
-    
+
     def __repr__(self):
-        return f"<{type(self).__name__}({list(self._entry_finder.keys())})>"    
+        return f"<{type(self).__name__}({list(self._entry_finder.keys())})>"
 
     def __len__(self):
         return len(self._entry_finder)
@@ -183,7 +227,6 @@ class PriorityQueue:
         raise KeyError('pop from an empty priority queue')
 
 
-
 @dataclass(order=True, eq=True, frozen=True)
 class PrioritizedItem:
     priority: int
@@ -193,38 +236,40 @@ class PrioritizedItem:
 def where(condition:numpy.ndarray[bool,...]) -> Iterator[tuple[int,...]]:
     return zip(*numpy.where(condition))
 
-def cost_plus_one(point1:Point, point2:Point, old_cost:int, tablero:numpy.ndarray[T,T]) -> int:
+
+def cost_plus_one(point1:Any, point2:Any, old_cost:int, tablero:Any) -> int:
     return old_cost+1
 
 
-def shortest_path_length_grid(
-    inicio:Point, 
-    meta:Point|Callable[[Point],bool], 
-    tablero:numpy.ndarray[T,T], 
-    neighbors:Callable[[Point,numpy.ndarray[T,T]],Iterable[Point]],
-    cost:Callable[[Point,Point,int,numpy.ndarray[T,T]],int]=cost_plus_one, 
-    initial_cost:int=0) -> int:
+def shortest_path_grafo(
+    inicio:P,
+    meta:P|Callable[[P],bool],
+    tablero:Grafo,
+    neighbors:Callable[[P,Grafo],Iterable[P]],
+    cost:Callable[[P,P,int,Grafo],int]=cost_plus_one,
+    initial_cost:int=0) -> tuple[int,P]:
     #https://www.youtube.com/watch?v=sBe_7Mzb47Y
-    visitado = numpy.zeros_like(tablero, dtype=bool)
+    visitado = set()
     if not callable(meta):
         meta = partial(eq,meta)
     queue = PriorityQueue()
-    queue.add_task( (initial_cost,inicio) )
+    queue.add_task( (initial_cost,inicio), initial_cost )
     while queue:
         steps, p = queue.pop_task()
-        if visitado[p]:
+        if p in visitado:
             continue
-        visitado[p] = True
-        if meta(p):           
-            return steps
+        visitado.add(p)
+        if meta(p):
+            return steps,p
         for v in neighbors(p,tablero):
-            queue.add_task( (cost(p,v,steps,tablero),v) )   
-    return float("inf")
+            new_steps = cost(p,v,steps,tablero)
+            queue.add_task( (new_steps,v), new_steps )
+    return float("inf"),None
 
 
 def normalize(number:complex) -> complex:
     """
-    return a complex number such that each component 
+    return a complex number such that each component
     is 1 if said coordinate is non zero
     preserving its sign
     """
@@ -233,13 +278,20 @@ def normalize(number:complex) -> complex:
 
 
 
-BLACK_char = "█" 
+BLACK_char = "█"
 WHITE_char = '░'
 
 
 progress_bar = tqdm.tqdm_gui if "idlelib" in sys.modules else tqdm.tqdm
 
 
+def make_mirror_dict(data:Iterable[tuple[X,Y]]) -> dict[X|Y,Y|X]:
+    """create a dict such that dict[k]==v and dict[v]==k"""
+    return {k:v for a,b in data for k,v in [(a,b),(b,a)]}
+
+
+def mirror_dict(data:dict[X,T]) -> dict[X|T,T|X]:
+    return make_mirror_dict(data.items())
 
 
 __all__ = [ x for x in dir() if not (x.startswith("_") or x in __exclude_from_all__) ]
