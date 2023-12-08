@@ -145,7 +145,7 @@ class FileDict(PropertyConfig, BaseFileDict[str, str|bytes], MutableMappingExten
     https://www.youtube.com/watch?v=S_ipdVNSFlo
     """
 
-    def __init__(self, *argv, encoding:str="utf8", errors:str=None, **kwarg) -> None:
+    def __init__(self, *argv, encoding:str="utf8", errors:str|None=None, **kwarg) -> None:
         super().__init__(*argv, **kwarg)
         self.path.mkdir(exist_ok=True)
         self.encoding   = encoding

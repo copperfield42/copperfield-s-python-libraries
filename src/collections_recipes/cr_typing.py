@@ -2,6 +2,7 @@ from typing_recipes import (
     runtime_checkable,
     TracebackType,
     TYPE_CHECKING,
+    SupportsWrite,
     SupportsRead,
     NumberLike,
     TypeAlias,
@@ -14,7 +15,9 @@ from typing_recipes import (
     PathType,
     TypeVar,
     PathStr,
+    Generic,
     AnyStr,
+    Self,
     Any,
     KT,
     VT,
@@ -23,20 +26,28 @@ from typing_recipes import (
 )
 
 
-MOD :TypeAlias = int
-DIV :TypeAlias = int
+MOD: TypeAlias = int
+DIV: TypeAlias = int
 
-
-@runtime_checkable
-class SerializerToString(Protocol):
-    def dumps(self, value:Any, **kargv) -> str: ...
-    def loads(self, value:str | bytes, **kargv) -> Any:...
 
 
 @runtime_checkable
 class SerializerToFile(Protocol):
-    def dump(self, value:Any, file:IO[str]|IO[bytes], **kargv) -> None: ...
-    def load(self, file:SupportsRead[str|bytes], **kargv) -> Any:...
+    def dump(self, obj: Any, fp: SupportsWrite[str | bytes], **kwargs: Any ) -> None: ...
+    def load(self, fp: SupportsRead[str | bytes], **kwargs: Any ) -> Any: ...
+
+
+@runtime_checkable
+class SerializerToString(Protocol):
+    def dumps(self, obj: Any, **kwargs: Any) -> str: ...
+    def loads(self, s: str, **kwargs: Any) -> Any: ...
+
+
+@runtime_checkable
+class SerializerToBytes(Protocol):
+    def dumps(self, obj: Any, **kwargs: Any) -> bytes: ...
+    def loads(self, s: bytes, **kwargs: Any) -> Any: ...
+
 
 
 @runtime_checkable

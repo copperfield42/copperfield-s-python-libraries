@@ -1,7 +1,17 @@
+__package__ = 'collections_recipes'
+if __name__ == "__main__" and not __package__:
+    from relative_import_helper import relative_import_helper
+    __package__ = relative_import_helper(__file__,1)
+    del relative_import_helper
+    print("idle trick")
+
+
+
 from .cr_typing import (
     overload as _overload,
     TYPE_CHECKING as _TC,
     TypeVar as _TypeVar,
+    Self as _Self,
     T as _T,
 )
 
@@ -66,7 +76,7 @@ class MutableMappingExtended(AutoSized, MutableMapping):
                 return
 
 
-_Self = _TypeVar("_Self", bound="SequenceSliceView")
+# _Self = _TypeVar("_Self", bound="SequenceSliceView")
 
 class SequenceSliceView(Sequence[_T]):
     """View over an slice of a Sequence"""

@@ -1,20 +1,15 @@
 import typing as _typing
 
-
 from collections import *
 from collections import abc
-
 from . import abc_recipes, mapping_recipes
 from .filedict import *
 from .collections_recipes import *
-  
-#5/6/2022-14/7/2022 tested with mypy
+
+# 5/6/2022-14/7/2022 tested with mypy
 
 
-
-
-
-if _typing.TYPE_CHECKING: #to please mypy and so it correctly see the content of the module
+if _typing.TYPE_CHECKING:  # to please mypy and so it correctly see the content of the module
     __all__ = [
         'LastUpdatedOrderedDict',
         'SerializerDictConfig',
