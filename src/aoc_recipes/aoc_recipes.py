@@ -6,12 +6,13 @@ https://adventofcode.com
 """
 from __future__ import annotations
 
-from typing import NamedTuple, TypeVar, Iterable, Iterator, Hashable, Any
+from typing import NamedTuple, TypeVar, Iterable, Iterator, Hashable, Any, Self
 from math import copysign
 from heapq import heappush, heappop
 from operator import sub, eq, add
 from functools import partial
 from dataclasses import dataclass, field
+from numbers import Number, Complex
 import itertools
 import sys
 import numpy
@@ -29,7 +30,7 @@ P = TypeVar("P",bound=Hashable)
 Grafo = TypeVar("Grafo")
 
 
-def get_raw_data(path:str="./input.txt") -> str:
+def get_raw_data(path:str = "./input.txt") -> str:
     with open(path) as file:
         return file.read()
 
@@ -40,48 +41,48 @@ class Point(NamedTuple):
     y: int
 
     @property
-    def real(self):
+    def real(self) -> int:
         return self.x
 
     @property
-    def imag(self):
+    def imag(self) -> int:
         return self.y
 
-    def __add__(self, otro:Point) -> Point:
+    def __add__(self, otro:Point | tuple[int, int] | complex | int) -> Self:
         "self + otro"
-        x,y = self
+        x, y = self
         if isinstance(otro,(type(self),tuple)):
             ox, oy = otro
-        elif isinstance(otro, (int,float)):
-            ox, oy = otro,otro
-        elif isinstance(otro, complex):
+        elif isinstance(otro, Complex):
             ox, oy = self.from_complex(otro)
+        elif isinstance(otro, Number):
+            ox, oy = otro,otro
         else:
             return NotImplemented
         return type(self)(x+ox, y+oy)
 
     __radd__ = __add__
 
-    def __neg__(self) -> Point:
+    def __neg__(self) -> Self:
         "-self"
         x,y = self
         return type(self)(-x, -y)
 
-    def __sub__(self, otro:Point) -> Point:
+    def __sub__(self, otro:Point | complex | int) -> Self:
         "self - otro"
         return self + (-otro)
 
-    def __mul__(self, otro):
+    def __mul__(self, otro:complex | int) -> Self:
         "self * otro"
-        if isinstance(otro, (int,float)):
-            return type(self)(otro*self.x, otro*self.y)
-        if isinstance(otro, complex):
+        if isinstance(otro, Complex):
             return self.from_complex( complex(self)*otro )
+        if isinstance(otro, Number):
+            return type(self)(otro*self.x, otro*self.y)
         return NotImplemented
-    
+
     __rmul__ = __mul__
 
-    def __mod__(self, otro:int|Point) -> Point:
+    def __mod__(self, otro:int | Point) -> Self:
         """self % otro
            if otro is a number apply the mod to each coordinate
            if otro is a Point apply the mod point-wise ( Point(self.x % otro.x, self.y % otro.y) )
@@ -93,7 +94,7 @@ class Point(NamedTuple):
             return type(self)(self.x%ox, self.y%oy)
         return NotImplemented
 
-    def normalize(self) -> Point:
+    def normalize(self) -> Self:
         """
         return a Point such that each coordinate
         is 1 if said coordinate is non zero
@@ -102,12 +103,12 @@ class Point(NamedTuple):
         x,y = self
         return type(self)(x and int(copysign(1,x)),y and int(copysign(1,y)))
 
-    def distance_t(self, otro:Point) -> int:
+    def distance_t(self, otro: Point | tuple[int, int]) -> int:
         """
         The taxicab distance between two points
         https://en.wikipedia.org/wiki/Taxicab_geometry
         """
-        if not isinstance(otro, type(self)):
+        if not isinstance(otro, (type(self), tuple)):
             raise ValueError("No es un Point")
         x1,y1 = self
         x2,y2 = otro
@@ -117,10 +118,10 @@ class Point(NamedTuple):
         return complex(self.x, self.y)
 
     @classmethod
-    def from_complex(cls, number:complex) -> Point:
+    def from_complex(cls, number:complex) -> Self:
         return cls(int(number.real), int(number.imag))
 
-    def __divmod__(self, otro:int|Point) -> tuple[Point,Point]:
+    def __divmod__(self, otro: int | Point | tuple[int, int]) -> tuple[Self, Self]:
         "divmod(self, otro)"
         if isinstance(otro, int):
             x,y = self
@@ -135,7 +136,7 @@ class Point(NamedTuple):
             return Point(dx,dy),Point(mx,my)
         return NotImplemented
 
-    def __rdivmod__(self, otro:int|Point) -> tuple[Point,Point]:
+    def __rdivmod__(self, otro: int | Point | tuple[int, int]) -> tuple[Self,Self]:
         "divmod(otro, self)"
         if isinstance(otro, int):
             x,y = self
@@ -147,8 +148,8 @@ class Point(NamedTuple):
             ox,oy = otro
             dx,mx = divmod(ox,x)
             dy,my = divmod(oy,y)
-            return Point(dx,dy),Point(mx,my)
-        return NotImplemented        
+            return Point(dx,dy), Point(mx,my)
+        return NotImplemented
 
 
 DIRECCIONES={
@@ -163,11 +164,14 @@ DIRECCIONES={
     "+":(Point(1,0),Point(-1,0),Point(0,1),Point(0,-1)),
     "x":(Point(1,1),Point(-1,-1),Point(-1,1),Point(1,-1)),
     }
-DIRECCIONES["*"] = DIRECCIONES["+"]+DIRECCIONES["x"]
+DIRECCIONES["*"] = DIRECCIONES["+"] + DIRECCIONES["x"]
 
 
 def vecinos(point:Point, include_input:bool=False, direcciones:Iterable[Point]=DIRECCIONES["+"] ) -> Iterator[Point]:
-    """vecinos del punto dado en las 4 direcciones cardinales"""
+    """
+    vecinos del punto dado en las 4 direcciones cardinales
+    o las direcciones espesificadas
+    """
     if include_input:
         yield point
     yield from (p+point for p in direcciones)
@@ -179,7 +183,7 @@ def is_valid(point:Point|complex, shape:tuple[int,int]) -> bool:
     return 0<=point.real<x and 0<=point.imag<y
 
 
-def make_vecinos(point:Point|complex, validator:Callable[[Point|complex],bool], include_input:bool=False, direcciones:str|tuple[Point]="+") -> Iterator[Point]:
+def make_vecinos(point:Point|complex, validator:Callable[[Point|complex],bool], include_input:bool=False, direcciones:str | tuple[Point] = "+") -> Iterator[Point]:
     for v in vecinos(point,include_input=include_input, direcciones=DIRECCIONES[direcciones] if isinstance(direcciones,str) else direcciones ):
         if validator(v):
             yield v
@@ -197,7 +201,7 @@ class PriorityQueue:
         return bool(self._entry_finder)
 
     def __repr__(self):
-        return f"<{type(self).__name__}({list(self._entry_finder.keys())})>"
+        return f"<{type(self).__name__}({sorted(self._entry_finder.keys())})>"
 
     def __len__(self):
         return len(self._entry_finder)
@@ -246,8 +250,8 @@ def shortest_path_grafo(
     meta:P|Callable[[P],bool],
     tablero:Grafo,
     neighbors:Callable[[P,Grafo],Iterable[P]],
-    cost:Callable[[P,P,int,Grafo],int]=cost_plus_one,
-    initial_cost:int=0) -> tuple[int,P]:
+    cost:Callable[[P,P,X,Grafo],X]=cost_plus_one,
+    initial_cost:X=0) -> tuple[X,P]:
     #https://www.youtube.com/watch?v=sBe_7Mzb47Y
     visitado = set()
     if not callable(meta):
@@ -283,6 +287,7 @@ WHITE_char = '░'
 
 
 progress_bar = tqdm.tqdm_gui if "idlelib" in sys.modules else tqdm.tqdm
+#progress_bar = tqdm.tqdm_gui if "idlelib" in sys.modules or "pydevconsole" in sys.modules else tqdm.tqdm
 
 
 def make_mirror_dict(data:Iterable[tuple[X,Y]]) -> dict[X|Y,Y|X]:
@@ -292,6 +297,88 @@ def make_mirror_dict(data:Iterable[tuple[X,Y]]) -> dict[X|Y,Y|X]:
 
 def mirror_dict(data:dict[X,T]) -> dict[X|T,T|X]:
     return make_mirror_dict(data.items())
+
+
+def mod1n(number: int, base: int) -> int:
+    """A non zero modulos operator give resultos in [1,base]"""
+    return number%base or base
+
+
+class Point3(NamedTuple):
+    x: int
+    y: int
+    z: int
+
+    def __add__(self, otro: Point3) -> Point3:
+        """self + otro"""
+        x, y, z = self
+        if isinstance(otro, (type(self), tuple)):
+            ox, oy, oz = otro
+        elif isinstance(otro, Number):
+            ox, oy, oz = otro, otro, otro
+        else:
+            return NotImplemented
+        return type(self)(x+ox, y+oy, z+oz)
+
+    __radd__ = __add__
+
+    def __neg__(self) -> Point3:
+        """-self"""
+        x,y,z = self
+        return type(self)(-x, -y, -z)
+
+    def __sub__(self, otro: Point3) -> Point3:
+        """self - otro"""
+        return self + (-otro)
+
+    def __mul__(self, otro):
+        """self * otro"""
+        if isinstance(otro, Number):
+            return type(self)( *(otro*t for t in self) )
+        return NotImplemented
+
+    __rmul__ = __mul__
+
+    def __mod__(self, otro:int|Point3) -> Point3:
+        """self % otro
+           if otro is a number apply the mod to each coordinate
+           if otro is a Point apply the mod point-wise ( Point(self.x % otro.x, self.y % otro.y) )
+        """
+        if isinstance(otro, int):
+            return type(self)(*(t % otro for t in self))
+        if isinstance(otro, (tuple,type(self))):
+            return type(self)(*(t1 % t2 for t1, t2 in zip(self, otro, strict=True)))
+        return NotImplemented
+
+
+def all_points2(shape: tuple[int, int]) -> Iterable[Point]:
+    x, y = shape
+    return itertools.starmap(Point, itertools.product(range(x), range(y)))
+
+
+def where2(condition:numpy.ndarray[bool, bool]) -> Iterator[Point]:
+    return map(Point,*numpy.where(condition))
+
+
+def flood_fill(matrix: numpy.ndarray[bool, bool], initial: Point = Point(0, 0), mode:str="+") -> numpy.ndarray[bool, bool]:
+    result = numpy.zeros_like(matrix, dtype=bool)
+    points = set(where2(~matrix))
+    work = {initial}
+    while work:
+        p = work.pop()
+        result[p] = True
+        points.discard(p)
+        work.update(nextp for nextp in vecinos(p, direcciones=DIRECCIONES[mode]) if nextp in points)
+    return result
+
+
+def show_bool_matrix2(matrix: numpy.ndarray[bool, bool]):
+    X, Y = matrix.shape
+    for x in range(X):
+        for y in range(Y):
+            print(BLACK_char if matrix[x, y] else WHITE_char, sep="", end="")
+        print()
+    print()
 
 
 __all__ = [ x for x in dir() if not (x.startswith("_") or x in __exclude_from_all__) ]
