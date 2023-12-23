@@ -6,7 +6,7 @@ https://adventofcode.com
 """
 from __future__ import annotations
 
-from typing import NamedTuple, TypeVar, Iterable, Iterator, Hashable, Any, Self
+from typing import NamedTuple, TypeVar, Iterable, Iterator, Hashable, Any, Self, Generic
 from math import copysign
 from heapq import heappush, heappop
 from operator import sub, eq, add
@@ -82,7 +82,7 @@ class Point(NamedTuple):
 
     __rmul__ = __mul__
 
-    def __mod__(self, otro:int | Point) -> Self:
+    def __mod__(self, otro:int | Point | tuple[int, int]) -> Self:
         """self % otro
            if otro is a number apply the mod to each coordinate
            if otro is a Point apply the mod point-wise ( Point(self.x % otro.x, self.y % otro.y) )
@@ -152,7 +152,7 @@ class Point(NamedTuple):
         return NotImplemented
 
 
-DIRECCIONES={
+DIRECCIONES = {
     "R":Point(1,0),
     "L":Point(-1,0),
     "U":Point(0,1),
@@ -246,12 +246,12 @@ def cost_plus_one(point1:Any, point2:Any, old_cost:int, tablero:Any) -> int:
 
 
 def shortest_path_grafo(
-    inicio:P,
-    meta:P|Callable[[P],bool],
+    inicio: P,
+    meta: P | Callable[[P], bool],
     tablero:Grafo,
-    neighbors:Callable[[P,Grafo],Iterable[P]],
-    cost:Callable[[P,P,X,Grafo],X]=cost_plus_one,
-    initial_cost:X=0) -> tuple[X,P]:
+    neighbors: Callable[[P, Grafo], Iterable[P]],
+    cost: Callable[[P, P, X, Grafo], X] = cost_plus_one,
+    initial_cost: X = 0) -> tuple[X,P]:
     #https://www.youtube.com/watch?v=sBe_7Mzb47Y
     visitado = set()
     if not callable(meta):
@@ -350,6 +350,15 @@ class Point3(NamedTuple):
             return type(self)(*(t1 % t2 for t1, t2 in zip(self, otro, strict=True)))
         return NotImplemented
 
+    def normalize(self) -> Self:
+        """
+        return a Point3 such that each coordinate
+        is 1 if said coordinate is non zero
+        preserving its sign
+        """
+        x,y,z = self
+        return type(self)(x and int(copysign(1,x)), y and int(copysign(1,y)), z and int(copysign(1,z)))
+
 
 def all_points2(shape: tuple[int, int]) -> Iterable[Point]:
     x, y = shape
@@ -380,6 +389,54 @@ def show_bool_matrix2(matrix: numpy.ndarray[bool, bool]):
         print()
     print()
 
+
+def show_str_matrix2(matrix: numpy.ndarray[str, str]):
+    X, Y = matrix.shape
+    for x in range(X):
+        for y in range(Y):
+            print(matrix[x, y], sep="", end="")
+        print()
+    print()
+
+
+
+class PatternResult(NamedTuple, Generic[T]):
+    non_periodic: T
+    periodic: T
+    
+
+
+def find_pattern(iterable:Iterable[T], transform:Callable[[T], tuple[X, Hashable[Y]]]) -> PatternResult[tuple[X]]:
+    non_periodic = []
+    periodic = []
+    memory = {}
+    for i, item in enumerate(iterable):
+        data, record = transform(item)
+        if record in memory:
+            j = memory[record]
+            periodic = non_periodic[j:]
+            non_periodic = non_periodic[:j]
+            break
+        memory[record] = i
+        non_periodic.append(data)
+    return PatternResult(tuple(non_periodic), tuple(periodic))
+
+
+def find_pattern_size(iterable: Iterable[T], key: Callable[[T], Hashable[Y]] = None) -> PatternResult[int]:
+    non_periodic = 0
+    periodic = 0
+    memory = {}
+    for i, record in enumerate(iterable if key is None else map(key, iterable)):
+        if record in memory:
+            j = memory[record]
+            periodic = non_periodic - j
+            non_periodic = j
+            break
+        memory[record] = i
+        non_periodic += 1
+    return PatternResult(non_periodic, periodic)    
+        
+    
 
 __all__ = [ x for x in dir() if not (x.startswith("_") or x in __exclude_from_all__) ]
 del __exclude_from_all__
